@@ -1,0 +1,37 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group = 'com.one'
+version = '1.0-SNAPSHOT'
+
+// 메인 클래스 지정
+mainClassName = 'com.one.main.Main'
+
+repositories {
+    mavenCentral()
+    maven { url 'https://jitpack.io' }
+}
+
+dependencies {
+    // Modbus RTU 라이브러리 (j2mod)
+    implementation 'com.ghgande:j2mod:3.1.1'
+
+    // 시리얼 통신 라이브러리
+    implementation 'org.scream3r:jssc:2.8.0'
+
+    // Kafka 클라이언트
+    implementation 'org.apache.kafka:kafka-clients:3.4.0'
+
+    // 로깅을 위한 SLF4J
+    implementation 'org.slf4j:slf4j-api:2.0.7'
+    implementation 'org.slf4j:slf4j-simple:2.0.7'
+
+    testImplementation platform('org.junit:junit-bom:5.10.0')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+}
+
+test {
+    useJUnitPlatform()
+}
