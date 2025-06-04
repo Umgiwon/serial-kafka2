@@ -24,7 +24,7 @@ public class ModbusKafkaProducer {
     /**
      * ModbusKafkaProducer 생성자
      * 
-     * @param bootstrapServers Kafka 부트스트랩 서버 (예: localhost:9092)
+     * @param bootstrapServers Kafka 부트스트랩 서버 (예: 192.168.219.51:9092)
      * @param topic 데이터를 전송할 Kafka 토픽
      */
     public ModbusKafkaProducer(String bootstrapServers, String topic) {
@@ -44,77 +44,81 @@ public class ModbusKafkaProducer {
     /**
      * 홀딩 레지스터 데이터를 Kafka로 전송
      * 
+     * @param slaveId 슬레이브 ID
      * @param registers 레지스터 값 배열
      * @param timestamp 데이터 타임스탬프
      * @throws ExecutionException 데이터 전송 중 오류 발생 시
      * @throws InterruptedException 스레드가 중단된 경우
      */
-    public void sendHoldingRegisters(int[] registers, long timestamp) 
+    public void sendHoldingRegisters(int slaveId, int[] registers, long timestamp)
             throws ExecutionException, InterruptedException {
-        String key = "holding_registers_" + timestamp;
+        String key = "slave_" + slaveId + "_holding_registers_" + timestamp;
         String value = Arrays.toString(registers);
         
         ProducerRecord<String, String> record = new ProducerRecord<>(topic, key, value);
         producer.send(record).get();
         
-        logger.info("홀딩 레지스터를 Kafka로 전송 완료: {}", value);
+        logger.info("슬레이브 {}: 홀딩 레지스터를 Kafka로 전송 완료: {}", slaveId, value);
     }
     
     /**
      * 입력 레지스터 데이터를 Kafka로 전송
      * 
+     * @param slaveId 슬레이브 ID
      * @param registers 레지스터 값 배열
      * @param timestamp 데이터 타임스탬프
      * @throws ExecutionException 데이터 전송 중 오류 발생 시
      * @throws InterruptedException 스레드가 중단된 경우
      */
-    public void sendInputRegisters(int[] registers, long timestamp) 
+    public void sendInputRegisters(int slaveId, int[] registers, long timestamp)
             throws ExecutionException, InterruptedException {
-        String key = "input_registers_" + timestamp;
+        String key = "slave_" + slaveId + "_input_registers_" + timestamp;
         String value = Arrays.toString(registers);
         
         ProducerRecord<String, String> record = new ProducerRecord<>(topic, key, value);
         producer.send(record).get();
         
-        logger.info("입력 레지스터를 Kafka로 전송 완료: {}", value);
+        logger.info("슬레이브 {}: 입력 레지스터를 Kafka로 전송 완료: {}", slaveId, value);
     }
     
     /**
      * 코일 데이터를 Kafka로 전송
      * 
+     * @param slaveId 슬레이브 ID
      * @param coils 코일 값 배열
      * @param timestamp 데이터 타임스탬프
      * @throws ExecutionException 데이터 전송 중 오류 발생 시
      * @throws InterruptedException 스레드가 중단된 경우
      */
-    public void sendCoils(boolean[] coils, long timestamp) 
+    public void sendCoils(int slaveId, boolean[] coils, long timestamp)
             throws ExecutionException, InterruptedException {
-        String key = "coils_" + timestamp;
+        String key = "slave_" + slaveId + "_coils_" + timestamp;
         String value = Arrays.toString(coils);
         
         ProducerRecord<String, String> record = new ProducerRecord<>(topic, key, value);
         producer.send(record).get();
         
-        logger.info("코일을 Kafka로 전송 완료: {}", value);
+        logger.info("슬레이브 {}: 코일을 Kafka로 전송 완료: {}", slaveId, value);
     }
     
     /**
      * 이산 입력 데이터를 Kafka로 전송
      * 
+     * @param slaveId 슬레이브 ID
      * @param discreteInputs 이산 입력 값 배열
      * @param timestamp 데이터 타임스탬프
      * @throws ExecutionException 데이터 전송 중 오류 발생 시
      * @throws InterruptedException 스레드가 중단된 경우
      */
-    public void sendDiscreteInputs(boolean[] discreteInputs, long timestamp) 
+    public void sendDiscreteInputs(int slaveId, boolean[] discreteInputs, long timestamp)
             throws ExecutionException, InterruptedException {
-        String key = "discrete_inputs_" + timestamp;
+        String key = "slave_" + slaveId + "_discrete_inputs_" + timestamp;
         String value = Arrays.toString(discreteInputs);
         
         ProducerRecord<String, String> record = new ProducerRecord<>(topic, key, value);
         producer.send(record).get();
         
-        logger.info("이산 입력을 Kafka로 전송 완료: {}", value);
+        logger.info("슬레이브 {}: 이산 입력을 Kafka로 전송 완료: {}", slaveId, value);
     }
     
     /**

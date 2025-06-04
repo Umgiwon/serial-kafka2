@@ -43,7 +43,7 @@ private static final int QUANTITY = 10;
 ### Kafka 구성
 
 ```java
-private static final String BOOTSTRAP_SERVERS = "localhost:9092"; // Kafka 서버로 업데이트
+private static final String BOOTSTRAP_SERVERS = "192.168.219.51:9092"; // Kafka 서버로 업데이트
 private static final String TOPIC = "modbus-data";
 ```
 
@@ -115,7 +115,7 @@ private static final int POLLING_INTERVAL = 5; // 초 단위
    ```
 4. 토픽 생성:
    ```
-   bin/kafka-topics.sh --create --topic modbus-data --bootstrap-server localhost:9092
+   bin/kafka-topics.sh --create --topic modbus-data --bootstrap-server 192.168.219.51:9092
    ```
 
 ### 애플리케이션 빌드
@@ -140,7 +140,7 @@ Gradle을 사용하여 애플리케이션 빌드:
 
 1. Kafka 컨슈머를 시작하여 메시지 확인:
    ```
-   bin/kafka-console-consumer.sh --topic modbus-data --from-beginning --bootstrap-server localhost:9092
+   bin/kafka-console-consumer.sh --topic modbus-data --from-beginning --bootstrap-server 192.168.219.51:9092
    ```
 
 2. 애플리케이션 로그에서 성공적인 연결 및 데이터 읽기 확인:

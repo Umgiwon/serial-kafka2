@@ -16,7 +16,6 @@ public class ModbusRtuClient {
     private static final Logger logger = LoggerFactory.getLogger(ModbusRtuClient.class);
 
     private final SerialConnection connection;
-    private final int slaveId;
     private final int startAddress;
     private final int quantity;
 
@@ -28,13 +27,12 @@ public class ModbusRtuClient {
      * @param dataBits 데이터 비트 (예: 8)
      * @param stopBits 정지 비트 (예: 1)
      * @param parity 패리티 (예: 0=없음, 1=홀수, 2=짝수)
-     * @param slaveId 슬레이브 ID
      * @param startAddress 레지스터 읽기 시작 주소
      * @param quantity 읽을 레지스터 수량
      * @throws Exception Modbus 클라이언트 초기화 중 오류 발생 시
      */
     public ModbusRtuClient(String portName, int baudRate, int dataBits, int stopBits, int parity,
-                          int slaveId, int startAddress, int quantity) throws Exception {
+                          int startAddress, int quantity) throws Exception {
         // 시리얼 포트 매개변수 구성
         SerialParameters params = new SerialParameters();
         params.setPortName(portName);
@@ -47,12 +45,11 @@ public class ModbusRtuClient {
 
         // 시리얼 연결 생성
         this.connection = new SerialConnection(params);
-        this.slaveId = slaveId;
         this.startAddress = startAddress;
         this.quantity = quantity;
 
-        logger.info("ModbusRtuClient 초기화 완료 - 포트: {}, 전송속도: {}, 슬레이브ID: {}", 
-                   portName, baudRate, slaveId);
+        logger.info("ModbusRtuClient 초기화 완료 - 포트: {}, 전송속도: {}",
+                   portName, baudRate);
     }
 
     /**
@@ -80,10 +77,11 @@ public class ModbusRtuClient {
     /**
      * Modbus 슬레이브에서 홀딩 레지스터 읽기
      * 
+     * @param slaveId 슬레이브 ID
      * @return 레지스터 값 배열
      * @throws Exception 레지스터 읽기 중 오류 발생 시
      */
-    public int[] readHoldingRegisters() throws Exception {
+    public int[] readHoldingRegisters(int slaveId) throws Exception {
         ReadMultipleRegistersRequest request = new ReadMultipleRegistersRequest(startAddress, quantity);
         request.setUnitID(slaveId);
 
@@ -98,17 +96,18 @@ public class ModbusRtuClient {
             registers[i] = response.getRegisterValue(i);
         }
 
-        logger.info("홀딩 레지스터 읽기 완료: {}", Arrays.toString(registers));
+        logger.info("슬레이브 {}: 홀딩 레지스터 읽기 완료: {}", slaveId, Arrays.toString(registers));
         return registers;
     }
 
     /**
      * Modbus 슬레이브에서 입력 레지스터 읽기
      * 
+     * @param slaveId 슬레이브 ID
      * @return 레지스터 값 배열
      * @throws Exception 레지스터 읽기 중 오류 발생 시
      */
-    public int[] readInputRegisters() throws Exception {
+    public int[] readInputRegisters(int slaveId) throws Exception {
         ReadInputRegistersRequest request = new ReadInputRegistersRequest(startAddress, quantity);
         request.setUnitID(slaveId);
 
@@ -123,17 +122,18 @@ public class ModbusRtuClient {
             registers[i] = response.getRegisterValue(i);
         }
 
-        logger.info("입력 레지스터 읽기 완료: {}", Arrays.toString(registers));
+        logger.info("슬레이브 {}: 입력 레지스터 읽기 완료: {}", slaveId, Arrays.toString(registers));
         return registers;
     }
 
     /**
      * Modbus 슬레이브에서 코일 읽기
      * 
+     * @param slaveId 슬레이브 ID
      * @return 코일 값 배열
      * @throws Exception 코일 읽기 중 오류 발생 시
      */
-    public boolean[] readCoils() throws Exception {
+    public boolean[] readCoils(int slaveId) throws Exception {
         ReadCoilsRequest request = new ReadCoilsRequest(startAddress, quantity);
         request.setUnitID(slaveId);
 
@@ -148,17 +148,18 @@ public class ModbusRtuClient {
             coils[i] = response.getCoilStatus(i);
         }
 
-        logger.info("코일 읽기 완료: {}", Arrays.toString(coils));
+        logger.info("슬레이브 {}: 코일 읽기 완료: {}", slaveId, Arrays.toString(coils));
         return coils;
     }
 
     /**
      * Modbus 슬레이브에서 이산 입력 읽기
      * 
+     * @param slaveId 슬레이브 ID
      * @return 이산 입력 값 배열
      * @throws Exception 이산 입력 읽기 중 오류 발생 시
      */
-    public boolean[] readDiscreteInputs() throws Exception {
+    public boolean[] readDiscreteInputs(int slaveId) throws Exception {
         ReadInputDiscretesRequest request = new ReadInputDiscretesRequest(startAddress, quantity);
         request.setUnitID(slaveId);
 
@@ -173,7 +174,7 @@ public class ModbusRtuClient {
             discreteInputs[i] = response.getDiscreteStatus(i);
         }
 
-        logger.info("이산 입력 읽기 완료: {}", Arrays.toString(discreteInputs));
+        logger.info("슬레이브 {}: 이산 입력 읽기 완료: {}", slaveId, Arrays.toString(discreteInputs));
         return discreteInputs;
     }
 }

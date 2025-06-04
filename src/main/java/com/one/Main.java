@@ -21,12 +21,15 @@ public class Main {
     private static final int DATA_BITS = 8;
     private static final int STOP_BITS = 1;
     private static final int PARITY = 0; // 0=없음, 1=홀수, 2=짝수
-    private static final int SLAVE_ID = 1;
+
+    // 슬레이브 ID 배열 (최대 10개 컴프레셔)
+    private static final int[] SLAVE_IDS = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+
     private static final int START_ADDRESS = 0;
     private static final int QUANTITY = 10;
 
     // Kafka 구성 FIXME: Kafka 서버에 맞게 수정
-    private static final String BOOTSTRAP_SERVERS = "localhost:9092";
+    private static final String BOOTSTRAP_SERVERS = "192.168.219.51:9092";
     private static final String TOPIC = "modbus-data";
 
     // 폴링 간격(초)
@@ -36,16 +39,16 @@ public class Main {
         logger.info("Modbus RTU에서 Kafka로 애플리케이션 시작 중");
 
         try {
-            // Modbus RTU 클라이언트 초기화
+            // Modbus RTU 클라이언트 초기화 (slaveId 제외)
             ModbusRtuClient modbusClient = new ModbusRtuClient(
                 PORT_NAME, BAUD_RATE, DATA_BITS, STOP_BITS, PARITY,
-                SLAVE_ID, START_ADDRESS, QUANTITY
+                START_ADDRESS, QUANTITY
             );
 
             // Kafka 프로듀서 초기화
             ModbusKafkaProducer kafkaProducer = new ModbusKafkaProducer(BOOTSTRAP_SERVERS, TOPIC);
 
-            // Modbus 슬레이브에 연결
+            // Modbus 연결
             modbusClient.connect();
 
             // 주기적으로 데이터를 폴링하기 위한 스케줄러 생성
@@ -54,30 +57,37 @@ public class Main {
             // 폴링 작업 스케줄링
             executor.scheduleAtFixedRate(() -> {
                 try {
-                    // Modbus에서 데이터 읽기
-                    logger.info("Modbus 데이터 폴링 중...");
-
-                    // 홀딩 레지스터 읽기
-                    int[] holdingRegisters = modbusClient.readHoldingRegisters();
-
-                    // 입력 레지스터 읽기
-                    int[] inputRegisters = modbusClient.readInputRegisters();
-
-                    // 코일 읽기
-                    boolean[] coils = modbusClient.readCoils();
-
-                    // 이산 입력 읽기
-                    boolean[] discreteInputs = modbusClient.readDiscreteInputs();
-
                     // 현재 타임스탬프 가져오기
                     long timestamp = System.currentTimeMillis();
 
-                    // 데이터를 Kafka로 전송
-                    kafkaProducer.sendHoldingRegisters(holdingRegisters, timestamp);
-                    kafkaProducer.sendInputRegisters(inputRegisters, timestamp);
-                    kafkaProducer.sendCoils(coils, timestamp);
-                    kafkaProducer.sendDiscreteInputs(discreteInputs, timestamp);
+                    // 각 슬레이브 ID에 대해 반복
+                    for (int slaveId : SLAVE_IDS) {
+                        try {
+                            logger.info("슬레이브 {}: Modbus 데이터 폴링 중...", slaveId);
 
+                            // 홀딩 레지스터 읽기
+                            int[] holdingRegisters = modbusClient.readHoldingRegisters(slaveId);
+
+                            // 입력 레지스터 읽기
+                            int[] inputRegisters = modbusClient.readInputRegisters(slaveId);
+
+                            // 코일 읽기
+                            boolean[] coils = modbusClient.readCoils(slaveId);
+
+                            // 이산 입력 읽기
+                            boolean[] discreteInputs = modbusClient.readDiscreteInputs(slaveId);
+
+                            // 데이터를 Kafka로 전송
+                            kafkaProducer.sendHoldingRegisters(slaveId, holdingRegisters, timestamp);
+                            kafkaProducer.sendInputRegisters(slaveId, inputRegisters, timestamp);
+                            kafkaProducer.sendCoils(slaveId, coils, timestamp);
+                            kafkaProducer.sendDiscreteInputs(slaveId, discreteInputs, timestamp);
+
+                        } catch (Exception e) {
+                            logger.error("슬레이브 {}: Modbus 데이터 폴링 중 오류 발생", slaveId, e);
+                            // 한 슬레이브에서 오류가 발생해도 다른 슬레이브는 계속 처리
+                        }
+                    }
                 } catch (Exception e) {
                     logger.error("Modbus 데이터 폴링 중 오류 발생", e);
                 }
