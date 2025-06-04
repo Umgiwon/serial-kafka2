@@ -15,9 +15,14 @@ import java.util.Arrays;
 public class ModbusRtuClient {
     private static final Logger logger = LoggerFactory.getLogger(ModbusRtuClient.class);
 
+    // 재시도 관련 상수
+    private static final int MAX_RETRY_ATTEMPTS = 3;
+    private static final long RETRY_DELAY_MS = 1000;
+
     private final SerialConnection connection;
     private final int startAddress;
     private final int quantity;
+    private final SerialParameters params;
 
     /**
      * ModbusRtuClient 생성자
@@ -34,7 +39,7 @@ public class ModbusRtuClient {
     public ModbusRtuClient(String portName, int baudRate, int dataBits, int stopBits, int parity,
                           int startAddress, int quantity) throws Exception {
         // 시리얼 포트 매개변수 구성
-        SerialParameters params = new SerialParameters();
+        this.params = new SerialParameters();
         params.setPortName(portName);
         params.setBaudRate(baudRate);
         params.setDatabits(dataBits);
@@ -53,13 +58,57 @@ public class ModbusRtuClient {
     }
 
     /**
-     * Modbus 슬레이브에 연결
+     * Modbus 슬레이브에 연결 (재시도 로직 포함)
      * 
-     * @throws Exception 슬레이브 연결 중 오류 발생 시
+     * @throws Exception 모든 재시도 후에도 연결 실패 시
      */
     public void connect() throws Exception {
-        connection.open();
-        logger.info("Modbus 슬레이브에 연결됨");
+        Exception lastException = null;
+
+        for (int attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt++) {
+            try {
+                if (!connection.isOpen()) {
+                    connection.open();
+                    logger.info("Modbus 슬레이브에 연결됨 (시도 {}/{})", attempt, MAX_RETRY_ATTEMPTS);
+                    return; // 성공적으로 연결됨
+                } else {
+                    logger.info("Modbus 슬레이브에 이미 연결되어 있음");
+                    return;
+                }
+            } catch (Exception e) {
+                lastException = e;
+                logger.warn("Modbus 슬레이브 연결 실패 (시도 {}/{}): {}",
+                           attempt, MAX_RETRY_ATTEMPTS, e.getMessage());
+
+                if (attempt < MAX_RETRY_ATTEMPTS) {
+                    logger.info("{}ms 후 재시도...", RETRY_DELAY_MS);
+                    Thread.sleep(RETRY_DELAY_MS);
+                }
+            }
+        }
+
+        // 모든 재시도 실패 후 마지막 예외 던지기
+        logger.error("최대 재시도 횟수({})를 초과했습니다. 연결 실패", MAX_RETRY_ATTEMPTS);
+        throw lastException;
+    }
+
+    /**
+     * 연결이 끊어진 경우 재연결 시도
+     *
+     * @return 재연결 성공 여부
+     */
+    private boolean reconnectIfNeeded() {
+        try {
+            if (!connection.isOpen()) {
+                logger.warn("연결이 끊어졌습니다. 재연결 시도 중...");
+                connect();
+                return true;
+            }
+            return true; // 이미 연결되어 있음
+        } catch (Exception e) {
+            logger.error("재연결 실패: {}", e.getMessage());
+            return false;
+        }
     }
 
     /**
@@ -67,114 +116,216 @@ public class ModbusRtuClient {
      */
     public void disconnect() {
         try {
-            connection.close();
-            logger.info("Modbus 슬레이브 연결 해제됨");
+            if (connection.isOpen()) {
+                connection.close();
+                logger.info("Modbus 슬레이브 연결 해제됨");
+            }
         } catch (Exception e) {
             logger.error("Modbus 슬레이브 연결 해제 중 오류 발생", e);
         }
     }
 
     /**
-     * Modbus 슬레이브에서 홀딩 레지스터 읽기
+     * Modbus 슬레이브에서 홀딩 레지스터 읽기 (재시도 로직 포함)
      * 
      * @param slaveId 슬레이브 ID
      * @return 레지스터 값 배열
-     * @throws Exception 레지스터 읽기 중 오류 발생 시
+     * @throws Exception 모든 재시도 후에도 읽기 실패 시
      */
     public int[] readHoldingRegisters(int slaveId) throws Exception {
-        ReadMultipleRegistersRequest request = new ReadMultipleRegistersRequest(startAddress, quantity);
-        request.setUnitID(slaveId);
+        Exception lastException = null;
 
-        ModbusSerialTransaction transaction = new ModbusSerialTransaction(connection);
-        transaction.setRequest(request);
-        transaction.execute();
+        for (int attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt++) {
+            try {
+                // 연결이 끊어진 경우 재연결 시도
+                if (!reconnectIfNeeded()) {
+                    continue; // 재연결 실패, 다음 시도로
+                }
 
-        ReadMultipleRegistersResponse response = (ReadMultipleRegistersResponse) transaction.getResponse();
+                ReadMultipleRegistersRequest request = new ReadMultipleRegistersRequest(startAddress, quantity);
+                request.setUnitID(slaveId);
 
-        int[] registers = new int[response.getWordCount()];
-        for (int i = 0; i < registers.length; i++) {
-            registers[i] = response.getRegisterValue(i);
+                ModbusSerialTransaction transaction = new ModbusSerialTransaction(connection);
+                transaction.setRequest(request);
+                transaction.execute();
+
+                ReadMultipleRegistersResponse response = (ReadMultipleRegistersResponse) transaction.getResponse();
+
+                int[] registers = new int[response.getWordCount()];
+                for (int i = 0; i < registers.length; i++) {
+                    registers[i] = response.getRegisterValue(i);
+                }
+
+                logger.info("슬레이브 {}: 홀딩 레지스터 읽기 완료: {}", slaveId, Arrays.toString(registers));
+                return registers;
+            } catch (Exception e) {
+                lastException = e;
+                logger.warn("슬레이브 {}: 홀딩 레지스터 읽기 실패 (시도 {}/{}): {}",
+                           slaveId, attempt, MAX_RETRY_ATTEMPTS, e.getMessage());
+
+                if (attempt < MAX_RETRY_ATTEMPTS) {
+                    logger.info("{}ms 후 재시도...", RETRY_DELAY_MS);
+                    Thread.sleep(RETRY_DELAY_MS);
+                }
+            }
         }
 
-        logger.info("슬레이브 {}: 홀딩 레지스터 읽기 완료: {}", slaveId, Arrays.toString(registers));
-        return registers;
+        // 모든 재시도 실패 후 마지막 예외 던지기
+        logger.error("슬레이브 {}: 최대 재시도 횟수({})를 초과했습니다. 홀딩 레지스터 읽기 실패",
+                    slaveId, MAX_RETRY_ATTEMPTS);
+        throw lastException;
     }
 
     /**
-     * Modbus 슬레이브에서 입력 레지스터 읽기
+     * Modbus 슬레이브에서 입력 레지스터 읽기 (재시도 로직 포함)
      * 
      * @param slaveId 슬레이브 ID
      * @return 레지스터 값 배열
-     * @throws Exception 레지스터 읽기 중 오류 발생 시
+     * @throws Exception 모든 재시도 후에도 읽기 실패 시
      */
     public int[] readInputRegisters(int slaveId) throws Exception {
-        ReadInputRegistersRequest request = new ReadInputRegistersRequest(startAddress, quantity);
-        request.setUnitID(slaveId);
+        Exception lastException = null;
 
-        ModbusSerialTransaction transaction = new ModbusSerialTransaction(connection);
-        transaction.setRequest(request);
-        transaction.execute();
+        for (int attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt++) {
+            try {
+                // 연결이 끊어진 경우 재연결 시도
+                if (!reconnectIfNeeded()) {
+                    continue; // 재연결 실패, 다음 시도로
+                }
 
-        ReadInputRegistersResponse response = (ReadInputRegistersResponse) transaction.getResponse();
+                ReadInputRegistersRequest request = new ReadInputRegistersRequest(startAddress, quantity);
+                request.setUnitID(slaveId);
 
-        int[] registers = new int[response.getWordCount()];
-        for (int i = 0; i < registers.length; i++) {
-            registers[i] = response.getRegisterValue(i);
+                ModbusSerialTransaction transaction = new ModbusSerialTransaction(connection);
+                transaction.setRequest(request);
+                transaction.execute();
+
+                ReadInputRegistersResponse response = (ReadInputRegistersResponse) transaction.getResponse();
+
+                int[] registers = new int[response.getWordCount()];
+                for (int i = 0; i < registers.length; i++) {
+                    registers[i] = response.getRegisterValue(i);
+                }
+
+                logger.info("슬레이브 {}: 입력 레지스터 읽기 완료: {}", slaveId, Arrays.toString(registers));
+                return registers;
+            } catch (Exception e) {
+                lastException = e;
+                logger.warn("슬레이브 {}: 입력 레지스터 읽기 실패 (시도 {}/{}): {}",
+                           slaveId, attempt, MAX_RETRY_ATTEMPTS, e.getMessage());
+
+                if (attempt < MAX_RETRY_ATTEMPTS) {
+                    logger.info("{}ms 후 재시도...", RETRY_DELAY_MS);
+                    Thread.sleep(RETRY_DELAY_MS);
+                }
+            }
         }
 
-        logger.info("슬레이브 {}: 입력 레지스터 읽기 완료: {}", slaveId, Arrays.toString(registers));
-        return registers;
+        // 모든 재시도 실패 후 마지막 예외 던지기
+        logger.error("슬레이브 {}: 최대 재시도 횟수({})를 초과했습니다. 입력 레지스터 읽기 실패",
+                    slaveId, MAX_RETRY_ATTEMPTS);
+        throw lastException;
     }
 
     /**
-     * Modbus 슬레이브에서 코일 읽기
+     * Modbus 슬레이브에서 코일 읽기 (재시도 로직 포함)
      * 
      * @param slaveId 슬레이브 ID
      * @return 코일 값 배열
-     * @throws Exception 코일 읽기 중 오류 발생 시
+     * @throws Exception 모든 재시도 후에도 읽기 실패 시
      */
     public boolean[] readCoils(int slaveId) throws Exception {
-        ReadCoilsRequest request = new ReadCoilsRequest(startAddress, quantity);
-        request.setUnitID(slaveId);
+        Exception lastException = null;
 
-        ModbusSerialTransaction transaction = new ModbusSerialTransaction(connection);
-        transaction.setRequest(request);
-        transaction.execute();
+        for (int attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt++) {
+            try {
+                // 연결이 끊어진 경우 재연결 시도
+                if (!reconnectIfNeeded()) {
+                    continue; // 재연결 실패, 다음 시도로
+                }
 
-        ReadCoilsResponse response = (ReadCoilsResponse) transaction.getResponse();
+                ReadCoilsRequest request = new ReadCoilsRequest(startAddress, quantity);
+                request.setUnitID(slaveId);
 
-        boolean[] coils = new boolean[response.getBitCount()];
-        for (int i = 0; i < coils.length; i++) {
-            coils[i] = response.getCoilStatus(i);
+                ModbusSerialTransaction transaction = new ModbusSerialTransaction(connection);
+                transaction.setRequest(request);
+                transaction.execute();
+
+                ReadCoilsResponse response = (ReadCoilsResponse) transaction.getResponse();
+
+                boolean[] coils = new boolean[response.getBitCount()];
+                for (int i = 0; i < coils.length; i++) {
+                    coils[i] = response.getCoilStatus(i);
+                }
+
+                logger.info("슬레이브 {}: 코일 읽기 완료: {}", slaveId, Arrays.toString(coils));
+                return coils;
+            } catch (Exception e) {
+                lastException = e;
+                logger.warn("슬레이브 {}: 코일 읽기 실패 (시도 {}/{}): {}",
+                           slaveId, attempt, MAX_RETRY_ATTEMPTS, e.getMessage());
+
+                if (attempt < MAX_RETRY_ATTEMPTS) {
+                    logger.info("{}ms 후 재시도...", RETRY_DELAY_MS);
+                    Thread.sleep(RETRY_DELAY_MS);
+                }
+            }
         }
 
-        logger.info("슬레이브 {}: 코일 읽기 완료: {}", slaveId, Arrays.toString(coils));
-        return coils;
+        // 모든 재시도 실패 후 마지막 예외 던지기
+        logger.error("슬레이브 {}: 최대 재시도 횟수({})를 초과했습니다. 코일 읽기 실패",
+                    slaveId, MAX_RETRY_ATTEMPTS);
+        throw lastException;
     }
 
     /**
-     * Modbus 슬레이브에서 이산 입력 읽기
+     * Modbus 슬레이브에서 이산 입력 읽기 (재시도 로직 포함)
      * 
      * @param slaveId 슬레이브 ID
      * @return 이산 입력 값 배열
-     * @throws Exception 이산 입력 읽기 중 오류 발생 시
+     * @throws Exception 모든 재시도 후에도 읽기 실패 시
      */
     public boolean[] readDiscreteInputs(int slaveId) throws Exception {
-        ReadInputDiscretesRequest request = new ReadInputDiscretesRequest(startAddress, quantity);
-        request.setUnitID(slaveId);
+        Exception lastException = null;
 
-        ModbusSerialTransaction transaction = new ModbusSerialTransaction(connection);
-        transaction.setRequest(request);
-        transaction.execute();
+        for (int attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt++) {
+            try {
+                // 연결이 끊어진 경우 재연결 시도
+                if (!reconnectIfNeeded()) {
+                    continue; // 재연결 실패, 다음 시도로
+                }
 
-        ReadInputDiscretesResponse response = (ReadInputDiscretesResponse) transaction.getResponse();
+                ReadInputDiscretesRequest request = new ReadInputDiscretesRequest(startAddress, quantity);
+                request.setUnitID(slaveId);
 
-        boolean[] discreteInputs = new boolean[response.getBitCount()];
-        for (int i = 0; i < discreteInputs.length; i++) {
-            discreteInputs[i] = response.getDiscreteStatus(i);
+                ModbusSerialTransaction transaction = new ModbusSerialTransaction(connection);
+                transaction.setRequest(request);
+                transaction.execute();
+
+                ReadInputDiscretesResponse response = (ReadInputDiscretesResponse) transaction.getResponse();
+
+                boolean[] discreteInputs = new boolean[response.getBitCount()];
+                for (int i = 0; i < discreteInputs.length; i++) {
+                    discreteInputs[i] = response.getDiscreteStatus(i);
+                }
+
+                logger.info("슬레이브 {}: 이산 입력 읽기 완료: {}", slaveId, Arrays.toString(discreteInputs));
+                return discreteInputs;
+            } catch (Exception e) {
+                lastException = e;
+                logger.warn("슬레이브 {}: 이산 입력 읽기 실패 (시도 {}/{}): {}",
+                           slaveId, attempt, MAX_RETRY_ATTEMPTS, e.getMessage());
+
+                if (attempt < MAX_RETRY_ATTEMPTS) {
+                    logger.info("{}ms 후 재시도...", RETRY_DELAY_MS);
+                    Thread.sleep(RETRY_DELAY_MS);
+                }
+            }
         }
 
-        logger.info("슬레이브 {}: 이산 입력 읽기 완료: {}", slaveId, Arrays.toString(discreteInputs));
-        return discreteInputs;
+        // 모든 재시도 실패 후 마지막 예외 던지기
+        logger.error("슬레이브 {}: 최대 재시도 횟수({})를 초과했습니다. 이산 입력 읽기 실패",
+                    slaveId, MAX_RETRY_ATTEMPTS);
+        throw lastException;
     }
 }
