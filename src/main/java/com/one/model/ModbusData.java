@@ -4,6 +4,7 @@ import java.util.Arrays;
 
 /**
  * Modbus 데이터를 나타내는 제네릭 클래스
+ *
  * @param <T> 데이터 타입 (int[] 또는 boolean[])
  */
 public class ModbusData<T> {
@@ -11,13 +12,13 @@ public class ModbusData<T> {
     private final ModbusDataType dataType;
     private final T data;
     private final long timestamp;
-    
+
     /**
      * ModbusData 생성자
-     * 
-     * @param slaveId 슬레이브 ID
-     * @param dataType 데이터 타입
-     * @param data 데이터 값
+     *
+     * @param slaveId   슬레이브 ID
+     * @param dataType  데이터 타입
+     * @param data      데이터 값
      * @param timestamp 타임스탬프
      */
     public ModbusData(int slaveId, ModbusDataType dataType, T data, long timestamp) {
@@ -26,23 +27,23 @@ public class ModbusData<T> {
         this.data = data;
         this.timestamp = timestamp;
     }
-    
+
     public int getSlaveId() {
         return slaveId;
     }
-    
+
     public ModbusDataType getDataType() {
         return dataType;
     }
-    
+
     public T getData() {
         return data;
     }
-    
+
     public long getTimestamp() {
         return timestamp;
     }
-    
+
     @Override
     public String toString() {
         String dataString;
@@ -53,7 +54,7 @@ public class ModbusData<T> {
         } else {
             dataString = data.toString();
         }
-        
+
         return String.format("ModbusData{slaveId=%d, dataType=%s, data=%s, timestamp=%d}",
                 slaveId, dataType, dataString, timestamp);
     }

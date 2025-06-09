@@ -12,13 +12,13 @@ import java.util.Arrays;
  */
 public class KafkaMessageFormatter {
     private static final ObjectMapper objectMapper = new ObjectMapper();
-    
+
     /**
      * Modbus 데이터를 JSON 형식으로 포맷팅
-     * 
-     * @param slaveId 슬레이브 ID
-     * @param data 데이터 (int[] 또는 boolean[])
-     * @param dataType 데이터 타입
+     *
+     * @param slaveId   슬레이브 ID
+     * @param data      데이터 (int[] 또는 boolean[])
+     * @param dataType  데이터 타입
      * @param timestamp 타임스탬프
      * @return JSON 형식의 문자열
      */
@@ -27,7 +27,7 @@ public class KafkaMessageFormatter {
         rootNode.put("slaveId", slaveId);
         rootNode.put("timestamp", timestamp);
         rootNode.put("dataType", dataType.getKey());
-        
+
         if (data instanceof int[]) {
             ArrayNode valuesNode = rootNode.putArray("values");
             for (int value : (int[]) data) {
@@ -39,7 +39,7 @@ public class KafkaMessageFormatter {
                 valuesNode.add(value);
             }
         }
-        
+
         try {
             return objectMapper.writeValueAsString(rootNode);
         } catch (Exception e) {

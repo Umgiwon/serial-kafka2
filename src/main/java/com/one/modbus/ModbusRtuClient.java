@@ -27,18 +27,18 @@ public class ModbusRtuClient {
 
     /**
      * ModbusRtuClient 생성자
-     * 
-     * @param portName 시리얼 포트 이름 (예: COM1, /dev/ttyS0)
-     * @param baudRate 전송 속도 (예: 9600)
-     * @param dataBits 데이터 비트 (예: 8)
-     * @param stopBits 정지 비트 (예: 1)
-     * @param parity 패리티 (예: 0=없음, 1=홀수, 2=짝수)
+     *
+     * @param portName     시리얼 포트 이름 (예: COM1, /dev/ttyS0)
+     * @param baudRate     전송 속도 (예: 9600)
+     * @param dataBits     데이터 비트 (예: 8)
+     * @param stopBits     정지 비트 (예: 1)
+     * @param parity       패리티 (예: 0=없음, 1=홀수, 2=짝수)
      * @param startAddress 레지스터 읽기 시작 주소
-     * @param quantity 읽을 레지스터 수량
+     * @param quantity     읽을 레지스터 수량
      * @throws Exception Modbus 클라이언트 초기화 중 오류 발생 시
      */
     public ModbusRtuClient(String portName, int baudRate, int dataBits, int stopBits, int parity,
-                          int startAddress, int quantity) throws Exception {
+                           int startAddress, int quantity) throws Exception {
         // 시리얼 포트 매개변수 구성
         this.params = new SerialParameters();
         params.setPortName(portName);
@@ -55,12 +55,12 @@ public class ModbusRtuClient {
         this.quantity = quantity;
 
         logger.info("ModbusRtuClient 초기화 완료 - 포트: {}, 전송속도: {}",
-                   portName, baudRate);
+                portName, baudRate);
     }
 
     /**
      * Modbus 슬레이브에 연결 (재시도 로직 포함)
-     * 
+     *
      * @throws Exception 모든 재시도 후에도 연결 실패 시
      */
     public void connect() throws Exception {
@@ -79,7 +79,7 @@ public class ModbusRtuClient {
             } catch (Exception e) {
                 lastException = e;
                 logger.warn("Modbus 슬레이브 연결 실패 (시도 {}/{}): {}",
-                           attempt, MAX_RETRY_ATTEMPTS, e.getMessage());
+                        attempt, MAX_RETRY_ATTEMPTS, e.getMessage());
 
                 if (attempt < MAX_RETRY_ATTEMPTS) {
                     logger.info("{}ms 후 재시도...", RETRY_DELAY_MS);
@@ -128,10 +128,10 @@ public class ModbusRtuClient {
 
     /**
      * 재시도 로직을 포함한 제네릭 실행 메서드
-     * 
-     * @param <T> 반환 타입
-     * @param slaveId 슬레이브 ID
-     * @param operation 실행할 작업
+     *
+     * @param <T>           반환 타입
+     * @param slaveId       슬레이브 ID
+     * @param operation     실행할 작업
      * @param operationName 작업 이름 (로깅용)
      * @return 작업 결과
      * @throws Exception 모든 재시도 후에도 실패 시
@@ -151,8 +151,8 @@ public class ModbusRtuClient {
                 return result;
             } catch (Exception e) {
                 lastException = e;
-                logger.warn("슬레이브 {}: {} 실패 (시도 {}/{}): {}", 
-                           slaveId, operationName, attempt, MAX_RETRY_ATTEMPTS, e.getMessage());
+                logger.warn("슬레이브 {}: {} 실패 (시도 {}/{}): {}",
+                        slaveId, operationName, attempt, MAX_RETRY_ATTEMPTS, e.getMessage());
 
                 if (attempt < MAX_RETRY_ATTEMPTS) {
                     logger.info("{}ms 후 재시도...", RETRY_DELAY_MS);
@@ -162,14 +162,14 @@ public class ModbusRtuClient {
         }
 
         // 모든 재시도 실패 후 마지막 예외 던지기
-        logger.error("슬레이브 {}: 최대 재시도 횟수({})를 초과했습니다. {} 실패", 
-                    slaveId, MAX_RETRY_ATTEMPTS, operationName);
+        logger.error("슬레이브 {}: 최대 재시도 횟수({})를 초과했습니다. {} 실패",
+                slaveId, MAX_RETRY_ATTEMPTS, operationName);
         throw lastException;
     }
 
     /**
      * Modbus 슬레이브에서 홀딩 레지스터 읽기 (재시도 로직 포함)
-     * 
+     *
      * @param slaveId 슬레이브 ID
      * @return 레지스터 값 배열
      * @throws Exception 모든 재시도 후에도 읽기 실패 시
@@ -208,7 +208,7 @@ public class ModbusRtuClient {
 
     /**
      * Modbus 슬레이브에서 입력 레지스터 읽기 (재시도 로직 포함)
-     * 
+     *
      * @param slaveId 슬레이브 ID
      * @return 레지스터 값 배열
      * @throws Exception 모든 재시도 후에도 읽기 실패 시
@@ -247,7 +247,7 @@ public class ModbusRtuClient {
 
     /**
      * Modbus 슬레이브에서 코일 읽기 (재시도 로직 포함)
-     * 
+     *
      * @param slaveId 슬레이브 ID
      * @return 코일 값 배열
      * @throws Exception 모든 재시도 후에도 읽기 실패 시
@@ -286,7 +286,7 @@ public class ModbusRtuClient {
 
     /**
      * Modbus 슬레이브에서 이산 입력 읽기 (재시도 로직 포함)
-     * 
+     *
      * @param slaveId 슬레이브 ID
      * @return 이산 입력 값 배열
      * @throws Exception 모든 재시도 후에도 읽기 실패 시
